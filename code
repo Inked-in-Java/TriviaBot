@@ -1,0 +1,349 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using SKYPE4COMLib;
+using System.Threading;
+using System.IO;
+
+namespace Skype_TriviaBot
+{
+    public partial class Form1 : Form
+    {
+        private Skype skype;  //initialize a new Skype object
+
+        private const string trigger = "!"; //initialize a constant string for the trigger
+        private const string trigger2 = "?";
+        private const string msgTrigger = "";
+        private const string botMessageIdentifier = "bot: "; //initialize the bot ID
+        private string user; // variable to hold the username of the last message.
+
+        public List<string> users = new List<string>(); //create a list to store the users in the chat room
+
+        public Dictionary<string, int> userScore = new Dictionary<string, int>(); // create a Dictionary to hold the score for each player
+        private static Dictionary<string, string> questions = new Dictionary<string, string>();// dictionary to hold the questions and answers!
+
+        public bool isRunning;
+        public bool correctAnswer = false;
+
+        private static string questionT;
+        private static string AnswerT;
+
+        //string Chat_Name;
+        //string chat_msg;
+
+        public Form1()
+        {
+            InitializeComponent();
+            skype = new Skype();
+            skype.Attach(8, false);
+            skype.MessageStatus += new _ISkypeEvents_MessageStatusEventHandler(skype_MessageStatus);
+            skype.MessageStatus += this.SkypeMessageStatusChanged;
+          
+         
+        }
+
+        private void SkypeMessageStatusChanged(ChatMessage pMessage, TChatMessageStatus Status)
+        {
+            string Chat_Name = pMessage.ChatName;
+            string chat_msg = pMessage.Body;
+
+            if (pMessage.Body.Contains("!Start-Trivia"))
+            {
+                isRunning = true;
+                pMessage.Chat.SendMessage(botMessageIdentifier + "Trivia Perfection started at: " + DateTime.Now);
+
+                Load_General_Knowledge();
+
+                pMessage.Chat.SendMessage(botMessageIdentifier + " " + AskQuestion());
+                MessageBox.Show(AnswerT);
+            }
+           
+
+            else if (pMessage.Body.Contains(AnswerT.ToLower().ToString()))
+            {
+                if (!users.Contains(pMessage.Sender.FullName))
+                {
+                    users.Add(pMessage.Sender.FullName);
+                    lstUsers.Items.Add(pMessage.Sender.FullName);
+                }
+
+
+                if (userScore.ContainsKey(pMessage.Sender.FullName))
+                {
+                    int value = userScore[pMessage.Sender.FullName];
+                    userScore[pMessage.Sender.FullName] = value + 100;
+                    value = userScore[pMessage.Sender.FullName];
+                    pMessage.Chat.SendMessage(botMessageIdentifier + pMessage.Sender.FullName +
+                        " answered correctly, 100 points given!");
+
+                    pMessage.Chat.SendMessage(botMessageIdentifier + pMessage.Sender.FullName + " score is: " +
+                        value);
+
+                    pMessage.Chat.SendMessage(botMessageIdentifier + " " + AskQuestion());
+                    MessageBox.Show(AnswerT);
+                }
+                if (!userScore.ContainsKey(pMessage.Sender.FullName))
+                {
+                    userScore.Add(pMessage.Sender.FullName, 100);
+                    pMessage.Chat.SendMessage(botMessageIdentifier + pMessage.Sender.FullName +
+                           " answered correctly, 100 points given!");
+
+                    int value = userScore[pMessage.Sender.FullName];
+
+                    pMessage.Chat.SendMessage(botMessageIdentifier + pMessage.Sender.FullName + " score is: " +
+                        value);
+
+                    pMessage.Chat.SendMessage(botMessageIdentifier + " " + AskQuestion());
+                    MessageBox.Show(AnswerT);
+
+                }
+                else
+                    return;
+            } 
+
+            
+        }
+
+        private void qPanel1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            
+        }
+
+        private void cmdClose_Click(object sender, EventArgs e)
+        {
+            Environment.Exit(0);
+        }
+
+        private void txtChatName_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                Message.Chat_Name = txtChatName.Text;
+                txtChatName.Text = "";
+                txtChatLog.Text = "Trivia Perfection Started...";
+            }
+        }
+
+        //Function to Read Chat Messages
+        public void skype_MessageStatus(ChatMessage pMessage, TChatMessageStatus Status)
+        {
+           
+            string Chat_Name = pMessage.ChatName;
+            string chat_msg = pMessage.Body;
+           // Thread.Sleep(2000);
+
+            if (!users.Contains(pMessage.Sender.FullName))
+            {
+                users.Add(pMessage.Sender.FullName);
+                lstUsers.Items.Add(pMessage.Sender.FullName);
+            }
+
+            //if (pMessage.ChatName != Chat_Name)
+            //{
+            //    return;
+            //}
+            //else
+            //{
+              
+                user = pMessage.Sender.FullName;
+                //proceed only if the msg is a trigger
+                if (pMessage.Body.IndexOf(trigger) == 0)
+                {
+                    //Remove the trigger and make lower case
+                    string command = pMessage.Body.Remove(0, trigger.Length).ToLower();
+
+                    //Send Message to Skype
+                    //pMessage.Chat.SendMessage(botMessageIdentifier + ProcessCommand(command));
+                    //txtChatLog.Text += "\r\n" + botMessageIdentifier + ProcessCommand(command);
+                    // Message.MSG = botMessageIdentifier + ProcessCommand(command);
+
+                    if (command == "users")
+                    {
+                        pMessage.Chat.SendMessage("user count: " + users.Count.ToString());
+                        foreach (var u in users)
+                        {
+                            pMessage.Chat.SendMessage(u);
+                            txtChatLog.Text += "\r\n" + botMessageIdentifier + "user count: " + users.Count.ToString();
+                            txtChatLog.Text += "\r\n" + botMessageIdentifier + u;
+                        }
+
+                    }
+
+                    //if (command == "lol")
+                    //{
+
+                    //    pMessage.Chat.SendMessage(botMessageIdentifier + ProcessMessage(pMessage.Sender.FullName, chat_msg));
+                    //    txtChatLog.Text += "\r\n" + botMessageIdentifier + ProcessMessage(pMessage.Sender.FullName, chat_msg);
+
+                    //}                   
+                    else
+                        ProcessCommand(pMessage.Body);
+ 
+                }
+            }
+       // }
+        //End Function
+
+        //Function to Process Commands from Chat
+        private string ProcessCommand(string str)
+        {
+
+            string result;
+
+            switch (str)
+            {
+                case "hello":
+                    result = "Hello: " + user;
+                    break;
+                case "users":
+                    result = "Sending.....User Names in Chat!";
+                    break;
+                case "Start-Trivia":
+                    result = "Loading Trivia Questions.....";
+                    result = result + " type !me if you want to play.....";
+                    Load_General_Knowledge();
+                    
+                    AskQuestion();
+                    break;
+                case "lol":
+                    result = "What is so Funny? " + user;
+                    break;  
+                case "Trivia":
+                    if (isRunning == true)
+                    {
+                        result = "Trivia Perfection is Running!";
+                       
+                    }
+                    else
+                        result = "Trivia Perfection is NOT running!";
+                    
+                    break;
+
+                default:
+                    result = "Sorry, I don't understand the Command";
+                    break;
+            }
+
+            return result;
+        }
+        //End Function
+
+        //Function to process what is said in Chat 
+        private string ProcessMessage(string user, string msg)
+        {
+            string result;
+
+            switch (msg)
+            {
+                case "lol":
+                    result = "What is so Funny? " + user;
+                    break;
+                case "Start-Trivia":
+                    result = "Loading Trivia Questions.....";
+                    result = result + " type !me if you want to play.....";
+                    Load_General_Knowledge();
+
+                    AskQuestion();
+                    break;
+                default:
+                    result = "sorry, I don't understand the command!";
+                    break;
+            }
+
+            //if (msg == AnswerT.ToLower())
+            //{
+            //    result = user + "answered correctly " + user + " received 20 points";
+            //}
+            return result;
+        }
+        //------End Function------
+        //Function to Load Qusetions for General Knowledge into the Questions Dictionary....
+        private static void Load_General_Knowledge()
+        {
+            questions.Clear();
+            string file = @"Assets\Questions\GeneralKnowledge_01.txt";
+            string Line = "";
+            string[] splitLine = null;
+
+            using (StreamReader reader = new StreamReader(file))
+            {
+                while (!reader.EndOfStream)
+                {
+                    Line = reader.ReadLine();
+                    splitLine = Line.Split('-');
+                    questions.Add(splitLine[0], splitLine[1]);
+                }
+            }
+        }
+
+        private void cmdStart_Click(object sender, EventArgs e)
+        {
+
+
+            if (cmdStart.Text == "Start")
+            {
+                cmdStart.Text = "Stop";
+                isRunning = true;
+                if (isRunning == true)
+                {
+
+                    skype.SendMessage(skype.CurrentUser.ToString(), " Trivia Pefection started at: " + DateTime.Now + "tpye [add me] to get added");
+
+                }
+                else
+                {
+                    isRunning = false;
+                    cmdStart.Text = "Start";
+                }
+            }
+        }
+        //------End Function------
+
+        //------Function to Ask the Questions
+        private static string AskQuestion()
+        {
+            Random rnd = new Random();
+            int x = rnd.Next(0, questions.Count);
+
+            var item = questions.ElementAt(x);
+            var itemQuestion = item.Key;
+            var itemAnswer = item.Value;
+            questionT = itemQuestion;
+            AnswerT = itemAnswer;
+
+      
+
+            questions.Remove(itemQuestion);
+
+            return questionT;
+
+        }
+        //------End Function------
+
+        private static string ProcessAnswer(string user, string msg)
+        {
+            string result;
+
+            if (msg == AnswerT.ToLower())
+            {
+                result = user + "answered correctly " + user + " received 20 points";
+            }
+            else
+            {
+                result = "";
+                return result;
+            }
+            return result;
+        }
+    }
+ }
